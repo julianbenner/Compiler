@@ -1,14 +1,21 @@
 grammar Grammar;
 
 program
-    : statement+
+    : functionR+
+    ;
+
+functionR
+    : 'int main' '(' ')' '{' stmntList=statementList '}' #Main
+    | 'int' functionname=VAR '(' ')' '{' stmntList=statementList '}' #Function
     ;
 
 statement
     : assignmentR ';' #AssignmentStatement
     | varDeclR ';' #VarDeclarationStatement
     | 'print' '(' printable=printableR ')' ';' #Print
+    | 'return' expr=expression ';' #Return
     | 'if' '(' eval=boolexpr ')' '{' stmntThenList=statementList '}' ('else' '{' stmntElseList=statementList '}')? #If
+    | 'while' '(' eval=boolexpr ')' '{' stmntList=statementList '}' #While
     ;
 
 statementList
@@ -46,7 +53,8 @@ boolexpr
     ;
 
 expression
-    : '(' expression ')' #Klammer
+    : functionname=VAR '(' ')' #Functioncall
+    | '(' expression ')' #Klammer
     | expression operator=('*'|'/') expression #Mult
     | expression operator=('+'|'-') expression #Add
     | zahl=ZAHL #Zahl
