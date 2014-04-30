@@ -13,8 +13,8 @@ public class Main {
 			CommonTokenStream tokens = new CommonTokenStream(lexer);
 			GrammarParser parser = new GrammarParser(tokens);
 
-			ParseTree tree = parser.addition();
-			new MyVisitor().visit(tree);
+			ParseTree tree = parser.program();
+			System.out.println(new MyVisitor().visit(tree));
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
