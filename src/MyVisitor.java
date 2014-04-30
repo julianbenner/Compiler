@@ -5,6 +5,7 @@ import parser.GrammarParser.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.StringJoiner;
 
 public class MyVisitor extends GrammarBaseVisitor<String> {
 	private static int currentLevel = 0;
@@ -31,6 +32,11 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	public String visitProgram(ProgramContext ctx) {
 		String output = ".class public Test\n" +
 				".super java/lang/Object\n";
+		for(FunctionRContext function: ctx.functionR()) {
+			if(function instanceof FunctionContext) {
+				functions.put((((FunctionContext) function).functionname).getText(), functions.size());
+			}
+		}
 		String stmnt = visitChildren(ctx);
 		output += stmnt;
 
@@ -41,6 +47,7 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	public String visitMain(MainContext ctx) {
 		String output = "";
 		variablesFunction = new HashMap<>();
+		variableIndex = 0;
 		String stmnt = visitStatementList(ctx.stmntList);
 		functions.put("main", functions.size());
 		variablesFunctions.put("main", variablesFunction);
@@ -59,13 +66,19 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	public String visitFunction(FunctionContext ctx) {
 		String output = "";
 		variablesFunction = new HashMap<>();
-
-		String stmnt = visitStatementList(ctx.stmntList);
-		functions.put(ctx.functionname.getText(), functions.size());
+		variableIndex = 0;
 		variablesFunctions.put(ctx.functionname.getText(), variablesFunction);
 		int labelFunction = requireFunctionIndex(ctx.functionname);
+		StringJoiner stringJoiner = new StringJoiner("");
+		for(int i=0;i<ctx.paramList.paramList.size();i++) {
+			stringJoiner.add("I");
+			visit(ctx.paramList.paramList.get(i));
+		}
+		String parameters = stringJoiner.toString();
+		String stmnt = visitStatementList(ctx.stmntList);
 
-		output += ".method public static " + "fct" + String.valueOf(labelFunction) + "()I\n";
+
+		output += ".method public static " + "fct" + String.valueOf(labelFunction) + "(" + parameters + ")I\n";
 		output += ".limit stack 100\n";
 		output += ".limit locals 100\n";
 		output += stmnt;
@@ -78,7 +91,13 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	@Override
 	public String visitFunctioncall(FunctioncallContext ctx) {
 		String output = "";
-		output += "invokestatic Test/fct" + requireFunctionIndex(ctx.functionname) + "()I";
+		StringJoiner stringJoiner = new StringJoiner("");
+		for(int i=0;i<ctx.paramList.paramList.size();i++) {
+			stringJoiner.add("I");
+			output += visit(ctx.paramList.paramList.get(i)) + "\n";
+		}
+		String parameters = stringJoiner.toString();
+		output += "invokestatic Test/fct" + requireFunctionIndex(ctx.functionname) + "(" + parameters + ")I";
 		return output;
 	}
 
@@ -216,7 +235,11 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 		if (variablesFunction.containsKey(ctx.var.getText())) {
 			/*throw new VariableAlreadyDefinedException(ctx.var);*/
 		}
+		int temp3 = currentLevel;
 		variablesFunction.put(ctx.var.getText(), getVariableIndex());
+		ArrayList<String> temp = ((ArrayList<String>) currentVariables.get(temp3));
+		Token temp2 = ctx.var;
+		temp.add(temp2.getText());
 		return "";
 	}
 
@@ -328,6 +351,7 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	private int requireVariableIndex(Token varNameToken) {
 		Integer varIndex = variablesFunction.get(varNameToken.getText());
 		if (varIndex == null) {
+			System.out.println("FDAASFDSAFSADF");
 			/*throw new UndeclaredVariableException(varNameToken);*/
 		}
 		return varIndex;

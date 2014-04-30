@@ -6,7 +6,7 @@ program
 
 functionR
     : 'int main' '(' ')' '{' stmntList=statementList '}' #Main
-    | 'int' functionname=VAR '(' ')' '{' stmntList=statementList '}' #Function
+    | 'int' functionname=VAR '(' paramList=parameterList ')' '{' stmntList=statementList '}' #Function
     ;
 
 statement
@@ -20,6 +20,15 @@ statement
 
 statementList
     : statement+
+    ;
+
+parameterList
+    : paramList+=varDeclR (',' paramList+=varDeclR)*
+    |
+    ;
+expressionList
+    : paramList+=expression (',' paramList+=expression)*
+    |
     ;
 
 printableR
@@ -41,7 +50,7 @@ assignmentR
 
 boolexpr
     : '(' boolexpr ')' #KlammerBool
-    | left=expression '==' right=expression #Equals
+    | left=expression '=' right=expression #Equals
     | left=expression '!=' right=expression #NotEquals
     | left=expression '<=' right=expression #LessEquals
     | left=expression '>=' right=expression #GreaterEquals
@@ -53,7 +62,7 @@ boolexpr
     ;
 
 expression
-    : functionname=VAR '(' ')' #Functioncall
+    : functionname=VAR '(' paramList=expressionList ')' #Functioncall
     | '(' expression ')' #Klammer
     | expression operator=('*'|'/') expression #Mult
     | expression operator=('+'|'-') expression #Add
