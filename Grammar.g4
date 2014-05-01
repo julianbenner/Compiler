@@ -12,9 +12,10 @@ functionR
 statement
     : assignmentR ';' #AssignmentStatement
     | varDeclR ';' #VarDeclarationStatement
-    | 'print' '(' printable=printableR ')' ';' #Print
+    | 'print' '(' printable=stringRec ')' ';' #Print
     | 'return' expr=expression ';' #Return
     | 'if' '(' eval=boolexpr ')' '{' stmntThenList=statementList '}' ('else' '{' stmntElseList=statementList '}')? #If
+    | 'if' '(' eval=boolexpr ')' stmnt=statement #IfSingle
     | 'while' '(' eval=boolexpr ')' '{' stmntList=statementList '}' #While
     ;
 
@@ -31,12 +32,23 @@ expressionList
     |
     ;
 
-printableR
-    : string ('+' string)* #PrintableL
+stringRec
+    : stringList+=string ('.' stringList+=string)* #RecursiveString
     ;
 
 string
-    : integer=expression #IntegerPrint
+    : stringContent = STRING #StringString
+    | integer=expression #IntegerString
+    ;
+
+stringContentRule
+    : '"' (VAR|WS)* '"'
+    ;
+
+types
+    : 'int'
+    | 'bool'
+    | 'string'
     ;
 
 varDeclR
@@ -57,8 +69,7 @@ boolexpr
     | left=expression '<' right=expression #Less
     | left=expression '>' right=expression #Greater
     | left=boolexpr '&&' right=boolexpr #And
-    | 'true' #True
-    | 'false' #False
+    | expression #ExpressionBool
     ;
 
 expression
@@ -68,18 +79,11 @@ expression
     | expression operator=('+'|'-') expression #Add
     | zahl=ZAHL #Zahl
     | var=VAR #Var
-    ;
-
-faktor
-    : zahl=ZAHL #Zahl2
-    | '(' + expr=expression + ')' #Verschachtelung
-    ;
-
-
-additionalt: links=additionalt '+' rechts=ZAHL #Plus
-    | zahl=ZAHL #Zahl1
+    | 'true' #True
+    | 'false' #False
     ;
 
 ZAHL: [0-9]+;
 VAR: [a-zA-Z][a-zA-Z_0-9]*;
-WS : [ \t\r\n]+ -> skip ;
+STRING: '"' [a-zA-Z_-\^=0-9,. ]* '"';
+WS : ([ \t\r\n]+) -> channel(HIDDEN) ;

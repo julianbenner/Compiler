@@ -1,15 +1,15 @@
-int main () {
-    int a :=0;
-    bool continue_loop := true ;
-    while ( continue_loop ) {
-        a:=a+1;
-        if(a=5) {
-            print (a);
-        } else {
-            print (0);
-        }
-        if(a =10)
-        continue_loop := false ;
+int pow(int a, int b) {
+    int c:=1;
+    while(b>0) {
+        c:=c*a;
+        b:=b-1;
     }
+    return c;
+}
+
+int main () {
+    int i:=2;
+    int j:=16;
+    print(i . " hoch " . j . " ist " . pow(i,j) . ", oder auch " . i . "^" . j . "=" . pow(i,j));
     return 0;
 }

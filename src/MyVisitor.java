@@ -205,11 +205,6 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	}
 
 	@Override
-	public String visitVerschachtelung(VerschachtelungContext ctx) {
-		return visitChildren(ctx) + "\n";
-	}
-
-	@Override
 	public String visitKlammer(KlammerContext ctx) {
 		return visitChildren(ctx);
 	}
@@ -220,8 +215,18 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	}
 
 	@Override
+	public String visitExpressionBool(ExpressionBoolContext ctx) {
+		return visitChildren(ctx);
+	}
+
+	@Override
 	public String visitZahl(ZahlContext ctx) {
 		return "ldc " + ctx.zahl.getText();
+	}
+
+	@Override
+	public String visitStringString(StringStringContext ctx) {
+		return "ldc " + ctx.stringContent.getText();
 	}
 
 	@Override
@@ -255,10 +260,32 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	}
 
 	@Override
-	public String visitIntegerPrint(IntegerPrintContext ctx) {
+	public String visitPrint(PrintContext ctx) {
 		return "  getstatic java/lang/System/out Ljava/io/PrintStream;\n" +
-				visit(ctx.integer) + "\n" +
-				"  invokevirtual java/io/PrintStream/println(I)V";
+				visit(ctx.printable) + "\n" +
+				"  invokevirtual java/io/PrintStream/print(Ljava/lang/String;)V";
+	}
+
+	@Override
+	public String visitRecursiveString(RecursiveStringContext ctx) {
+		String output = "";
+		//if(ctx.stringList.size() == 1) {
+		//	output += visit(ctx.stringList.get(0));
+		//} else {
+			output += "getstatic java/lang/System/out Ljava/io/PrintStream;\n" +
+					"new java/lang/StringBuilder\n" +
+					"dup\n";
+			output += "ldc \"\"\n";
+			output += "invokespecial java/lang/StringBuilder/<init>(Ljava/lang/String;)V\n";
+			StringJoiner stringJoiner = new StringJoiner("\n");
+			for (int i = 0; i < ctx.stringList.size(); i++) {
+				stringJoiner.add(visit(ctx.stringList.get(i)));
+				stringJoiner.add("invokevirtual java/lang/StringBuilder/append(" + (ctx.stringList.get(i) instanceof StringStringContext ? "Ljava/lang/String;" : "I") + ")Ljava/lang/StringBuilder;");
+			}
+			stringJoiner.add("invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;");
+			output += stringJoiner.toString();
+		//}
+		return output;
 	}
 
 	@Override
@@ -324,6 +351,26 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	}
 
 	@Override
+	public String visitIfSingle(IfSingleContext ctx) {
+		String output = "";
+
+		currentLevel++;
+		currentVariables.put(currentLevel, new ArrayList<String>());
+		String stmntThen = visit(ctx.stmnt);
+		for (String current : (ArrayList<String>) currentVariables.get(currentLevel)) {
+			invalidateVariable(current);
+		}
+		currentVariables.remove(currentLevel);
+		currentLevel--;
+		int labelAfterIf = getConditionalIndex();
+			output += visit(ctx.eval) + "\n";
+			output += "ifeq Label" + String.valueOf(labelAfterIf) + "\n";
+			output += stmntThen;
+			output += "\n" + "Label" + String.valueOf(labelAfterIf) + ":";
+		return output;
+	}
+
+	@Override
 	public String visitWhile(WhileContext ctx) {
 		String output = "";
 
@@ -351,7 +398,6 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	private int requireVariableIndex(Token varNameToken) {
 		Integer varIndex = variablesFunction.get(varNameToken.getText());
 		if (varIndex == null) {
-			System.out.println("FDAASFDSAFSADF");
 			/*throw new UndeclaredVariableException(varNameToken);*/
 		}
 		return varIndex;
