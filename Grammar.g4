@@ -6,7 +6,7 @@ program
 
 functionR
     : 'int main' '(' ')' '{' stmntList=statementList '}' #Main
-    | 'int' functionname=VAR '(' paramList=parameterList ')' '{' stmntList=statementList '}' #Function
+    | type=types functionname=VAR '(' paramList=parameterList ')' '{' stmntList=statementList '}' #Function
     ;
 
 statement
@@ -39,10 +39,6 @@ stringRec
 string
     : stringContent = STRING #StringString
     | integer=expression #IntegerString
-    ;
-
-stringContentRule
-    : '"' (VAR|WS)* '"'
     ;
 
 types
