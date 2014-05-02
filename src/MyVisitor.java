@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.StringJoiner;
 
 public class MyVisitor extends GrammarBaseVisitor<String> {
-	private static int currentLevel = 0;
+	private static int currentLevel = 0; // indicates the current level of scope depth
 	private static Map<Integer, ArrayList> currentVariables = new HashMap<>();
 
 	static {
@@ -17,13 +17,15 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 
 	private static int conditionalIndex = 0;
 	private static int variableIndex = 0;
-	private Map<String, Integer> variablesFunction;
-	private Map<String, Map<String,Integer>> variablesFunctions = new HashMap<>();
+	private Map<String, Integer> variableNameToId;
+	private Map<String, Integer> variableNameToType;
+	private Map<String, Map<String, Integer>> variablesFunctions = new HashMap<>();
 	private Map<String, Integer> functions = new HashMap<>();
 
 	private static int getConditionalIndex() {
 		return conditionalIndex++;
 	}
+
 	private static int getVariableIndex() {
 		return variableIndex++;
 	}
@@ -32,8 +34,8 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	public String visitProgram(ProgramContext ctx) {
 		String output = ".class public Test\n" +
 				".super java/lang/Object\n";
-		for(FunctionRContext function: ctx.functionR()) {
-			if(function instanceof FunctionContext) {
+		for (FunctionRContext function : ctx.functionR()) {
+			if (function instanceof FunctionContext) {
 				functions.put((((FunctionContext) function).functionname).getText(), functions.size());
 			}
 		}
@@ -46,11 +48,12 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	@Override
 	public String visitMain(MainContext ctx) {
 		String output = "";
-		variablesFunction = new HashMap<>();
+		variableNameToId = new HashMap<>();
+		variableNameToType = new HashMap<>();
 		variableIndex = 0;
 		String stmnt = visitStatementList(ctx.stmntList);
 		functions.put("main", functions.size());
-		variablesFunctions.put("main", variablesFunction);
+		variablesFunctions.put("main", variableNameToId);
 
 		output += ".method public static main([Ljava/lang/String;)V\n";
 		output += ".limit stack 100\n";
@@ -65,12 +68,13 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	@Override
 	public String visitFunction(FunctionContext ctx) {
 		String output = "";
-		variablesFunction = new HashMap<>();
+		variableNameToId = new HashMap<>();
+		variableNameToType = new HashMap<>();
 		variableIndex = 0;
-		variablesFunctions.put(ctx.functionname.getText(), variablesFunction);
+		variablesFunctions.put(ctx.functionname.getText(), variableNameToId);
 		int labelFunction = requireFunctionIndex(ctx.functionname);
 		StringJoiner stringJoiner = new StringJoiner("");
-		for(int i=0;i<ctx.paramList.paramList.size();i++) {
+		for (int i = 0; i < ctx.paramList.paramList.size(); i++) {
 			stringJoiner.add("I");
 			visit(ctx.paramList.paramList.get(i));
 		}
@@ -92,7 +96,7 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	public String visitFunctioncall(FunctioncallContext ctx) {
 		String output = "";
 		StringJoiner stringJoiner = new StringJoiner("");
-		for(int i=0;i<ctx.paramList.paramList.size();i++) {
+		for (int i = 0; i < ctx.paramList.paramList.size(); i++) {
 			stringJoiner.add("I");
 			output += visit(ctx.paramList.paramList.get(i)) + "\n";
 		}
@@ -106,7 +110,7 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 		int labelIsEqual = getConditionalIndex();
 		int labelAfterCompare = getConditionalIndex();
 		output += "isub\n";
-		output += comparison + " Label" + labelIsEqual +"\n";
+		output += comparison + " Label" + labelIsEqual + "\n";
 		output += "ldc 0\n";
 		output += "goto Label" + labelAfterCompare + "\n";
 		output += "Label" + labelIsEqual + ":\n";
@@ -178,11 +182,11 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 		output += visit(ctx.left) + "\n"; // TODO geht sicher auch ohne doppeltes Ausfuehren
 		output += "ldc 0\n";
 		output += "isub\n";
-		output += "ifeq Label" + labelFalse +"\n";
+		output += "ifeq Label" + labelFalse + "\n";
 		output += visit(ctx.left) + "\n";
 		output += visit(ctx.right) + "\n";
 		output += "isub\n";
-		output += "ifeq Label" + labelBothTrue +"\n";
+		output += "ifeq Label" + labelBothTrue + "\n";
 		output += "Label" + labelFalse + ":\n";
 		output += "ldc 0\n";
 		output += "goto Label" + labelAfterCompare + "\n";
@@ -231,30 +235,45 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 
 	@Override
 	public String visitAssignment(AssignmentContext ctx) {
-		return visit(ctx.expr) + "\n" +
-				"istore " + requireVariableIndex(ctx.var);
+		try {
+			if (ctx.expr.getChild(0) instanceof ExpressionContext) { // is int
+				if (variableToType(ctx.var.getText()) != 0) {
+					throw new Exception();
+				}
+			} else if (ctx.expr.getChild(0) instanceof StringRecContext) { // is int
+				if (variableToType(ctx.var.getText()) != 2) {
+					throw new Exception();
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		String output = "";
+		output += visit(ctx.expr) + "\n";
+		output += typeToLetter(variableToType(ctx.var.getText()));
+		output += "store ";
+		output += variableToId(ctx.var.getText());
+		return output;
 	}
 
 	@Override
 	public String visitVarDecl(VarDeclContext ctx) {
-		if (variablesFunction.containsKey(ctx.var.getText())) {
+		if (variableNameToId.containsKey(ctx.var.getText())) {
 			/*throw new VariableAlreadyDefinedException(ctx.var);*/
 		}
-		int temp3 = currentLevel;
-		variablesFunction.put(ctx.var.getText(), getVariableIndex());
-		ArrayList<String> temp = ((ArrayList<String>) currentVariables.get(temp3));
-		Token temp2 = ctx.var;
-		temp.add(temp2.getText());
+		declareVariable(ctx.var.getText(), ctx.type.getText());
 		return "";
+	}
+
+	private void declareVariable(String variableName, String variableType) {
+		variableNameToId.put(variableName, getVariableIndex());
+		variableNameToType.put(variableName, typeToInt(variableType));
+		((ArrayList<String>) currentVariables.get(currentLevel)).add(variableName);
 	}
 
 	@Override
 	public String visitDeclAssi(DeclAssiContext ctx) {
-		int temp3 = currentLevel;
-		variablesFunction.put(ctx.var.getText(), getVariableIndex());
-		ArrayList<String> temp = ((ArrayList<String>) currentVariables.get(temp3));
-		Token temp2 = ctx.var;
-		temp.add(temp2.getText());
+		declareVariable(ctx.var.getText(), ctx.type.getText());
 		return visit(ctx.expr) + "\n" +
 				"istore " + requireVariableIndex(ctx.var);
 	}
@@ -272,18 +291,33 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 		//if(ctx.stringList.size() == 1) {
 		//	output += visit(ctx.stringList.get(0));
 		//} else {
-			output += "getstatic java/lang/System/out Ljava/io/PrintStream;\n" +
-					"new java/lang/StringBuilder\n" +
-					"dup\n";
-			output += "ldc \"\"\n";
-			output += "invokespecial java/lang/StringBuilder/<init>(Ljava/lang/String;)V\n";
-			StringJoiner stringJoiner = new StringJoiner("\n");
-			for (int i = 0; i < ctx.stringList.size(); i++) {
-				stringJoiner.add(visit(ctx.stringList.get(i)));
-				stringJoiner.add("invokevirtual java/lang/StringBuilder/append(" + (ctx.stringList.get(i) instanceof StringStringContext ? "Ljava/lang/String;" : "I") + ")Ljava/lang/StringBuilder;");
+		output += "getstatic java/lang/System/out Ljava/io/PrintStream;\n" +
+				"new java/lang/StringBuilder\n" +
+				"dup\n";
+		output += "ldc \"\"\n";
+		output += "invokespecial java/lang/StringBuilder/<init>(Ljava/lang/String;)V\n";
+		StringJoiner stringJoiner = new StringJoiner("\n");
+		for (int i = 0; i < ctx.stringList.size(); i++) {
+			stringJoiner.add(visit(ctx.stringList.get(i)));
+			String type = "";
+			if (ctx.stringList.get(i) instanceof IntegerStringContext) { // if is expression
+				if ((((IntegerStringContext) ctx.stringList.get(i)).getChild(0)) instanceof VarContext) {
+					int varType = variableNameToType.get(((VarContext) (((IntegerStringContext) ctx.stringList.get(i)).getChild(0))).var.getText()); // if is variable, check variable type
+					if (varType == 0) {
+						type = "I";
+					} else if (varType == 2) {
+						type = "Ljava/lang/String;";
+					}
+				} else {
+					type = "I";
+				}
+			} else {
+				type = "Ljava/lang/String;";
 			}
-			stringJoiner.add("invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;");
-			output += stringJoiner.toString();
+			stringJoiner.add("invokevirtual java/lang/StringBuilder/append(" + type + ")Ljava/lang/StringBuilder;");
+		}
+		stringJoiner.add("invokevirtual java/lang/StringBuilder/toString()Ljava/lang/String;");
+		output += stringJoiner.toString();
 		//}
 		return output;
 	}
@@ -295,7 +329,9 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 
 	@Override
 	public String visitVar(VarContext ctx) {
-		return "iload " + requireVariableIndex(ctx.var);
+		int type = variableNameToType.get(ctx.var.getText());
+		int id = variableNameToId.get(ctx.var.getText()); // TODO exceptions
+		return typeToLetter(type) + "load " + requireVariableIndex(ctx.var);
 	}
 
 	@Override
@@ -363,10 +399,10 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 		currentVariables.remove(currentLevel);
 		currentLevel--;
 		int labelAfterIf = getConditionalIndex();
-			output += visit(ctx.eval) + "\n";
-			output += "ifeq Label" + String.valueOf(labelAfterIf) + "\n";
-			output += stmntThen;
-			output += "\n" + "Label" + String.valueOf(labelAfterIf) + ":";
+		output += visit(ctx.eval) + "\n";
+		output += "ifeq Label" + String.valueOf(labelAfterIf) + "\n";
+		output += stmntThen;
+		output += "\n" + "Label" + String.valueOf(labelAfterIf) + ":";
 		return output;
 	}
 
@@ -382,8 +418,8 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 		}
 		currentVariables.remove(currentLevel);
 		currentLevel--;
-		int labelBeforeWhile  = getConditionalIndex();
-		int labelAfterWhile  = getConditionalIndex();
+		int labelBeforeWhile = getConditionalIndex();
+		int labelAfterWhile = getConditionalIndex();
 
 		output += "Label" + String.valueOf(labelBeforeWhile) + ":\n";
 		output += visit(ctx.eval) + "\n";
@@ -396,11 +432,16 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 	}
 
 	private int requireVariableIndex(Token varNameToken) {
-		Integer varIndex = variablesFunction.get(varNameToken.getText());
+		Integer varIndex = variableNameToId.get(varNameToken.getText());
 		if (varIndex == null) {
 			/*throw new UndeclaredVariableException(varNameToken);*/
 		}
 		return varIndex;
+	}
+
+	private int requireVariableType(Token varNameToken) {
+		Integer varType = variableNameToType.get(varNameToken.getText());
+		return varType;
 	}
 
 	private int requireFunctionIndex(Token varNameToken) {
@@ -411,8 +452,49 @@ public class MyVisitor extends GrammarBaseVisitor<String> {
 		return fctIndex;
 	}
 
+	private int variableToId(String variable) {
+		Integer variableId = variableNameToId.get(variable);
+		if (variableId == null) {
+			/*throw new UndeclaredVariableException(varNameToken);*/
+		}
+		return variableId;
+	}
+
+	private int variableToType(String variable) {
+		Integer variableType = variableNameToType.get(variable);
+		if (variableType == null) {
+			/*throw new UndeclaredVariableException(varNameToken);*/
+		}
+		return variableType;
+	}
+
 	private void invalidateVariable(String variable) {
-		variablesFunction.remove(variable);
+		variableNameToId.remove(variable);
+		variableNameToType.remove(variable);
+	}
+
+	private int typeToInt(String type) {
+		switch (type) {
+			case "int":
+				return 0;
+			case "bool":
+				return 1;
+			case "string":
+				return 2;
+			default:
+				return -1;
+		}
+	}
+
+	private String typeToLetter(int type) {
+		switch (type) {
+			case 0:
+				return "i";
+			case 2:
+				return "a";
+			default:
+				return "";
+		}
 	}
 
 	@Override

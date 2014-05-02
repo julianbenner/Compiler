@@ -48,12 +48,17 @@ types
     ;
 
 varDeclR
-    : ('int'|'bool') var=VAR #varDecl
+    : type=types var=VAR #varDecl
     ;
 
 assignmentR
-    : ('int'|'bool') var=VAR ':=' expr=expression #DeclAssi
-    | var=VAR ':=' expr=expression #Assignment
+    : type=types var=VAR ':=' expr=variables #DeclAssi
+    | var=VAR ':=' expr=variables #Assignment
+    ;
+
+variables
+    : expression
+    | stringRec
     ;
 
 boolexpr
@@ -81,5 +86,6 @@ expression
 
 ZAHL: [0-9]+;
 VAR: [a-zA-Z][a-zA-Z_0-9]*;
+COMMENT: '//' ~('\r'|'\n')* -> skip;
 STRING: '"' [a-zA-Z_-\^=0-9,. ]* '"';
 WS : ([ \t\r\n]+) -> channel(HIDDEN) ;
