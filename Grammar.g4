@@ -12,6 +12,7 @@ functionR
 statement
     : assignmentR ';' #AssignmentStatement
     | varDeclR ';' #VarDeclarationStatement
+    | expression ';' #ExpressionCall
     | 'print' '(' printable=stringRec ')' ';' #Print
     | 'return' expr=expression ';' #Return
     | 'if' '(' eval=boolexpr ')' '{' stmntThenList=statementList '}' ('else' '{' stmntElseList=statementList '}')? #If
@@ -45,6 +46,7 @@ types
     : 'int'
     | 'bool'
     | 'string'
+    | 'void'
     ;
 
 varDeclR
@@ -62,7 +64,7 @@ variables
     ;
 
 boolexpr
-    : '(' boolexpr ')' #KlammerBool
+    : '(' boolexpr ')' #BracketsBool
     | left=expression '=' right=expression #Equals
     | left=expression '!=' right=expression #NotEquals
     | left=expression '<=' right=expression #LessEquals
@@ -75,16 +77,25 @@ boolexpr
 
 expression
     : functionname=VAR '(' paramList=expressionList ')' #Functioncall
-    | '(' expression ')' #Klammer
+    | '(' expression ')' #Brackets
     | expression operator=('*'|'/') expression #Mult
     | expression operator=('+'|'-') expression #Add
-    | zahl=ZAHL #Zahl
+    | number=NUMBER #Number
     | var=VAR #Var
     | 'true' #True
     | 'false' #False
     ;
 
-ZAHL: [0-9]+;
+ML_COMMENT : (NESTED_COMMENTARY) -> channel(HIDDEN) ;
+
+fragment NESTED_COMMENTARY :
+      '/*'
+      .*?
+      ( NESTED_COMMENTARY .*? )*
+      '*/'
+   ;
+
+NUMBER: [0-9]+;
 VAR: [a-zA-Z][a-zA-Z_0-9]*;
 COMMENT: '//' ~('\r'|'\n')* -> skip;
 STRING: '"' [a-zA-Z_-\^=0-9,. ]* '"';
